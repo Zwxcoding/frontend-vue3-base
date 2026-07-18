@@ -1,0 +1,19 @@
+{
+  "name": "frontend-vue3-base",
+  "version": "1.0.0",
+  "scripts": {
+    "dev:mp-weixin": "uni -p mp-weixin",
+    "build:mp-weixin": "uni build -p mp-weixin"
+  },
+  "dependencies": {
+    "@dcloudio/uni-app": "3.0.0-5010520260709002",
+    "@dcloudio/uni-mp-weixin": "3.0.0-5010520260709002",
+    "vue": "3.5.39"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "3.4.31",
+    "@dcloudio/vite-plugin-uni": "3.0.0-5010520260709002",
+    "@vitejs/plugin-vue": "5.2.4",
+    "vite": "5.2.8"
+  }
+}

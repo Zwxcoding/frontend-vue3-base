@@ -1,0 +1,70 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "首页"
+      }
+    },
+    {
+      "path": "pages/member/member",
+      "style": {
+        "navigationBarTitleText": "会员中心"
+      }
+    },
+    {
+      "path": "pages/login/login",
+      "style": {
+        "navigationBarTitleText": "会员注册"
+      }
+    },
+    {
+      "path": "pages/consume/index",
+      "style": {
+        "navigationBarTitleText": "消费结算"
+      }
+    },
+    {
+      "path": "pages/consume/success",
+      "style": {
+        "navigationBarTitleText": "消费成功"
+      }
+    },
+    {
+      "path": "pages/consume/records",
+      "style": {
+        "navigationBarTitleText": "消费记录"
+      }
+    },
+    {
+      "path": "pages/recharge/recharge",
+      "style": {
+        "navigationBarTitleText": "充值中心"
+      }
+    },
+    {
+      "path": "pages/service/service",
+      "style": {
+        "navigationBarTitleText": "洗车服务"
+      }
+    },
+    {
+      "path": "pages/admin/admin",
+      "style": {
+        "navigationBarTitleText": "管理后台"
+      }
+    },
+    {
+      "path": "pages/admin/activity/index",
+      "style": {
+        "navigationBarTitleText": "活动列表"
+      }
+    },
+    {
+      "path": "pages/admin/activity/create",
+      "style": {
+        "navigationBarTitleText": "新建活动"
+      }
+    }
+  ]
+}
