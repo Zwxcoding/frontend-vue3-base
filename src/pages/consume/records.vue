@@ -32,28 +32,14 @@
 <script setup>
 import { reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
+import { getConsumeRecords } from '../../services/consumeService.js'
 
 const state = reactive({
   records: []
 })
 
 const loadRecords = () => {
-  const stored = uni.getStorageSync('consumeRecords') || []
-  const recordsArray = Array.isArray(stored) ? stored : []
-  console.log('records.onShow 读取 consumeRecords', recordsArray)
-  state.records = recordsArray
-    .map((item) => ({
-      id: item.id || Date.now(),
-      serviceName: item.serviceName || item.service || '',
-      originalPrice: typeof item.originalPrice === 'number' ? item.originalPrice : item.original || 0,
-      discountAmount: typeof item.discountAmount === 'number' ? item.discountAmount : item.discount || 0,
-      couponAmount: typeof item.couponAmount === 'number' ? item.couponAmount : item.coupon || 0,
-      paidAmount: typeof item.paidAmount === 'number' ? item.paidAmount : item.amount || 0,
-      consumeTime: item.consumeTime || item.time || '',
-      vehicle: item.vehicle || '',
-      balanceAfter: typeof item.balanceAfter === 'number' ? item.balanceAfter : 0
-    }))
-    .sort((a, b) => b.id - a.id)
+  state.records = getConsumeRecords()
 }
 
 onShow(loadRecords)

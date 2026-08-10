@@ -34,23 +34,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
+import { getMemberInfo } from '../../services/memberService.js'
 
 const balance = ref(0)
 
-const getStoredMemberInfo = () => {
-  const fromMemberInfo = uni.getStorageSync('memberInfo')
-  if (fromMemberInfo && typeof fromMemberInfo === 'object') {
-    return fromMemberInfo
-  }
-  const fromLegacy = uni.getStorageSync('memberData')
-  if (fromLegacy && typeof fromLegacy === 'object') {
-    return fromLegacy
-  }
-  return { balance: 0 }
-}
-
 const loadBalance = () => {
-  const memberInfo = getStoredMemberInfo()
+  const memberInfo = getMemberInfo()
   balance.value = Number(Number(memberInfo.balance || 0).toFixed(2))
 }
 

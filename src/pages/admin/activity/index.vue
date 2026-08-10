@@ -19,29 +19,37 @@
           <text class="label">活动类型</text>
           <text class="value">{{ activity.type }}</text>
         </view>
-        <view class="row">
+        <view class="row" v-if="activity.type === 'discount'">
           <text class="label">折扣</text>
-          <text class="value">{{ activity.discount }}</text>
+          <text class="value">{{ activity.discountRate }}</text>
         </view>
-        <view class="row">
+        <view class="row" v-if="activity.type === 'recharge'">
           <text class="label">充值金额</text>
           <text class="value">{{ activity.rechargeAmount }}</text>
         </view>
-        <view class="row">
+        <view class="row" v-if="activity.type === 'recharge'">
           <text class="label">赠送金额</text>
-          <text class="value">{{ activity.giftAmount }}</text>
+          <text class="value">{{ activity.bonusAmount }}</text>
         </view>
         <view class="row">
           <text class="label">开始时间</text>
-          <text class="value">{{ activity.startDate }}</text>
+          <text class="value">{{ activity.startTime }}</text>
         </view>
         <view class="row">
           <text class="label">结束时间</text>
-          <text class="value">{{ activity.endDate }}</text>
+          <text class="value">{{ activity.endTime }}</text>
+        </view>
+        <view class="row">
+          <text class="label">优先级</text>
+          <text class="value">{{ activity.priority }}</text>
         </view>
         <view class="row">
           <text class="label">状态</text>
           <text class="value">{{ activity.status }}</text>
+        </view>
+        <view class="row">
+          <button class="primary-button" @click="goEdit(activity)">编辑</button>
+          <button class="primary-button" @click="removeActivity(activity)">删除</button>
         </view>
       </view>
     </view>
@@ -51,31 +59,34 @@
 <script setup>
 import { reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
+import { deleteActivity, getActivities } from '../../../services/activityService.js'
 
 const activities = reactive([])
 
-const getStoredActivities = () => {
-  const stored = uni.getStorageSync('activities') || uni.getStorageSync('activityList') || []
-  return Array.isArray(stored) ? stored : []
-}
-
 const loadActivities = () => {
-  const list = getStoredActivities().map((item) => ({
-    ...item,
-    status: item.status || 'active',
-    type: item.type || (item.activityType === 'discount' ? 'discount' : 'recharge'),
-    name: item.name || item.activityName || '活动',
-    discount: item.discount != null ? Number(item.discount) : 0,
-    rechargeAmount: item.rechargeAmount != null ? Number(item.rechargeAmount) : 0,
-    giftAmount: item.giftAmount != null ? Number(item.giftAmount) : 0,
-    startDate: item.startDate || item.startTime || '',
-    endDate: item.endDate || item.endTime || ''
-  }))
+  const list = getActivities()
   activities.splice(0, activities.length, ...list)
 }
 
 const goCreate = () => {
   uni.navigateTo({ url: '/pages/admin/activity/create' })
+}
+
+const goEdit = (activity) => {
+  uni.navigateTo({ url: `/pages/admin/activity/create?id=${activity.id}` })
+}
+
+const removeActivity = (activity) => {
+  uni.showModal({
+    title: '删除活动',
+    content: `确认删除“${activity.name}”吗？`,
+    success: (res) => {
+      if (!res.confirm) return
+      deleteActivity(activity.id)
+      loadActivities()
+      uni.showToast({ title: '活动已删除', icon: 'success' })
+    }
+  })
 }
 
 onShow(loadActivities)

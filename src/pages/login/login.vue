@@ -28,20 +28,13 @@
 
 <script setup>
 import { ref } from 'vue'
+import { saveMemberInfo } from '../../services/memberService.js'
 
 const phone = ref('')
 const plate = ref('')
 
 const saveMember = (data) => {
-  const existing = uni.getStorageSync('memberInfo') || {}
-  const memberInfo = {
-    ...existing,
-    ...data,
-    balance: Number(Number(data.balance || existing.balance || 0).toFixed(2))
-  }
-  uni.setStorageSync('memberInfo', memberInfo)
-  uni.setStorageSync('memberData', memberInfo)
-  uni.setStorageSync('memberBalance', memberInfo.balance)
+  saveMemberInfo(data)
   uni.showToast({ title: '注册成功', icon: 'success' })
   uni.navigateBack()
 }

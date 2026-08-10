@@ -1,6 +1,6 @@
 <template>
   <view class="page">
-    <text class="page-title">新建活动</text>
+    <text class="page-title">{{ editingId ? '编辑活动' : '新建活动' }}</text>
 
     <view class="form-card">
       <view class="form-row">
@@ -9,19 +9,21 @@
       </view>
       <view class="form-row">
         <text class="label">活动类型</text>
-        <input class="input" placeholder="recharge / discount" v-model="form.type" />
+        <picker :range="activityTypes" range-key="label" :value="activityTypeIndex" @change="changeActivityType">
+          <view class="input">{{ activityTypes[activityTypeIndex].label }}</view>
+        </picker>
       </view>
-      <view class="form-row">
-        <text class="label">折扣（0-1）</text>
-        <input class="input" placeholder="例如 0.8" v-model="form.discount" />
+      <view class="form-row" v-if="form.type === 'discount'">
+        <text class="label">折扣比例</text>
+        <input class="input" type="digit" placeholder="例如 8 或 0.8" v-model="form.discountRate" />
       </view>
-      <view class="form-row">
+      <view class="form-row" v-if="form.type === 'recharge'">
         <text class="label">充值金额</text>
         <input class="input" placeholder="例如 100" v-model="form.rechargeAmount" />
       </view>
-      <view class="form-row">
+      <view class="form-row" v-if="form.type === 'recharge'">
         <text class="label">赠送金额</text>
-        <input class="input" placeholder="例如 20" v-model="form.giftAmount" />
+        <input class="input" placeholder="例如 20" v-model="form.bonusAmount" />
       </view>
       <view class="form-row">
         <text class="label">开始时间</text>
@@ -31,28 +33,65 @@
         <text class="label">结束时间</text>
         <input class="input" placeholder="2026-07-20" v-model="form.endDate" />
       </view>
+      <view class="form-row">
+        <text class="label">优先级</text>
+        <input class="input" type="number" placeholder="例如 10" v-model="form.priority" />
+      </view>
+      <view class="form-row">
+        <text class="label">状态</text>
+        <input class="input" placeholder="active / inactive" v-model="form.status" />
+      </view>
       <button class="primary-button" @click="saveActivity">保存活动</button>
     </view>
   </view>
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
+import { createActivity, getActivityById, updateActivity } from '../../../services/activityService.js'
+
+const editingId = ref(null)
+const activityTypes = [
+  { label: '充值赠送', value: 'recharge' },
+  { label: '消费折扣', value: 'discount' }
+]
 
 const form = reactive({
   name: '',
   type: 'recharge',
-  discount: '',
+  discountRate: '',
   rechargeAmount: '',
-  giftAmount: '',
+  bonusAmount: '',
   startDate: '',
-  endDate: ''
+  endDate: '',
+  priority: '0',
+  status: 'active'
 })
 
-const getStoredActivities = () => {
-  const stored = uni.getStorageSync('activities') || uni.getStorageSync('activityList') || []
-  return Array.isArray(stored) ? stored : []
+const activityTypeIndex = computed(() => Math.max(activityTypes.findIndex((item) => item.value === form.type), 0))
+
+const changeActivityType = (event) => {
+  form.type = activityTypes[Number(event.detail.value)].value
 }
+
+onLoad((options) => {
+  if (!options.id) return
+  const activity = getActivityById(options.id)
+  if (!activity) return
+  editingId.value = activity.id
+  Object.assign(form, {
+    name: activity.name,
+    type: activity.type,
+    discountRate: activity.rule.discountRate || '',
+    rechargeAmount: activity.rule.rechargeAmount || '',
+    bonusAmount: activity.rule.bonusAmount || '',
+    startDate: activity.startTime,
+    endDate: activity.endTime,
+    priority: String(activity.priority),
+    status: activity.status
+  })
+})
 
 const saveActivity = () => {
   if (!form.name || !form.type || !form.startDate || !form.endDate) {
@@ -60,32 +99,39 @@ const saveActivity = () => {
     return
   }
 
-  const normalizedType = form.type === 'discount' ? 'discount' : 'recharge'
-  if (normalizedType === 'discount' && !form.discount) {
+  const normalizedType = form.type
+  if (normalizedType === 'discount' && !form.discountRate) {
     uni.showToast({ title: '请输入折扣', icon: 'none' })
     return
   }
-  if (normalizedType === 'recharge' && (!form.rechargeAmount || !form.giftAmount)) {
+  if (normalizedType === 'recharge' && (!form.rechargeAmount || !form.bonusAmount)) {
     uni.showToast({ title: '请输入充值金额和赠送金额', icon: 'none' })
     return
   }
 
-  const activity = {
-    id: Date.now(),
+  const inputDiscountRate = Number(form.discountRate)
+  const discountRate = inputDiscountRate > 1 ? inputDiscountRate / 10 : inputDiscountRate
+  if (normalizedType === 'discount' && (!Number.isFinite(discountRate) || discountRate <= 0 || discountRate > 1)) {
+    uni.showToast({ title: '请输入正确的折扣比例', icon: 'none' })
+    return
+  }
+
+  const activityData = {
     name: form.name.trim(),
     type: normalizedType,
-    status: 'active',
-    discount: normalizedType === 'discount' ? Number(form.discount) : 0,
-    rechargeAmount: normalizedType === 'recharge' ? Number(form.rechargeAmount) : 0,
-    giftAmount: normalizedType === 'recharge' ? Number(form.giftAmount) : 0,
-    startDate: form.startDate.trim(),
-    endDate: form.endDate.trim(),
-    createdAt: new Date().toISOString()
+    status: form.status === 'inactive' ? 'inactive' : 'active',
+    startTime: form.startDate.trim(),
+    endTime: form.endDate.trim(),
+    priority: Number(form.priority || 0),
+    ...(normalizedType === 'discount'
+      ? { discountRate }
+      : { rechargeAmount: Number(form.rechargeAmount), bonusAmount: Number(form.bonusAmount) })
   }
-  const existing = getStoredActivities()
-  const updated = [activity, ...existing]
-  uni.setStorageSync('activities', updated)
-  uni.setStorageSync('activityList', updated)
+  if (editingId.value) {
+    updateActivity(editingId.value, activityData)
+  } else {
+    createActivity(activityData)
+  }
   uni.showToast({ title: '活动已保存', icon: 'success' })
   uni.navigateBack()
 }

@@ -20,14 +20,25 @@
     <view class="section-card" v-if="member.registered">
       <text class="section-title">优惠活动</text>
       <view class="service-list">
-        <view class="service-item" v-for="activity in discountActivities" :key="activity.id">
+        <text class="activity-group-title" v-if="bestActivity">当前生效优惠</text>
+        <view class="activity-item activity-item-applied" v-if="bestActivity">
+          <view>
+            <text class="service-name">{{ bestActivity.name }}</text>
+            <text class="service-desc">{{ Number((bestActivity.discountRate * 10).toFixed(1)) }}折优惠</text>
+            <text class="activity-tip">系统已自动应用最高优先级优惠</text>
+          </view>
+          <text class="service-price">{{ bestActivity.discountRate }}</text>
+        </view>
+        <text class="activity-group-title" v-if="otherActivities.length > 0">其他活动</text>
+        <view class="activity-item activity-item-disabled" v-for="activity in otherActivities" :key="activity.id">
           <view>
             <text class="service-name">{{ activity.name }}</text>
-            <text class="service-desc">{{ activity.discount ? `${Math.round(activity.discount * 100)}折优惠` : '活动进行中' }}</text>
+            <text class="service-desc">{{ Number((activity.discountRate * 10).toFixed(1)) }}折优惠</text>
+            <text class="activity-tip activity-tip-muted">低优先级活动，不可选择</text>
           </view>
-          <text class="service-price">{{ activity.discount ? `${activity.discount}` : '活动' }}</text>
+          <text class="service-price">{{ activity.discountRate }}</text>
         </view>
-        <view v-if="discountActivities.length === 0" class="service-item">
+        <view v-if="currentActivities.length === 0" class="service-item">
           <text class="service-desc">暂无折扣活动</text>
         </view>
       </view>
@@ -91,6 +102,9 @@
 <script setup>
 import { computed, reactive, ref, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
+import { getMemberInfo } from '../../services/memberService.js'
+import { calculateConsume, consume } from '../../services/consumeService.js'
+import { getValidDiscountActivities } from '../../services/activityService.js'
 
 const member = reactive({
   registered: false,
@@ -103,41 +117,16 @@ const member = reactive({
   benefits: []
 })
 
-const discountActivities = reactive([])
-
-const getStoredMemberInfo = () => {
-  const fromMemberInfo = uni.getStorageSync('memberInfo')
-  if (fromMemberInfo && typeof fromMemberInfo === 'object') {
-    return fromMemberInfo
-  }
-  const fromLegacy = uni.getStorageSync('memberData')
-  if (fromLegacy && typeof fromLegacy === 'object') {
-    return fromLegacy
-  }
-  return { registered: false, phone: '', plate: '', level: '黄金会员', balance: 0, points: 0, coupons: 0, benefits: [] }
-}
-
-const saveStoredMemberInfo = (memberInfo) => {
-  const normalized = {
-    ...getStoredMemberInfo(),
-    ...memberInfo,
-    balance: Number(Number(memberInfo.balance || 0).toFixed(2))
-  }
-  uni.setStorageSync('memberInfo', normalized)
-  uni.setStorageSync('memberData', normalized)
-  uni.setStorageSync('memberBalance', normalized.balance)
-}
+const currentActivities = reactive([])
 
 const loadMember = () => {
-  const stored = getStoredMemberInfo()
+  const stored = getMemberInfo()
   Object.assign(member, { registered: false, phone: '', plate: '', level: '黄金会员', balance: 0, points: 0, coupons: 1, benefits: [] }, stored)
   member.balance = Number(Number(member.balance || 0).toFixed(2))
 }
 
 const loadActivities = () => {
-  const stored = uni.getStorageSync('activities') || []
-  const list = Array.isArray(stored) ? stored : []
-  discountActivities.splice(0, discountActivities.length, ...list.filter((activity) => activity.status === 'active' && activity.type === 'discount'))
+  currentActivities.splice(0, currentActivities.length, ...getValidDiscountActivities())
 }
 
 onMounted(() => {
@@ -158,55 +147,46 @@ const services = [
 ]
 
 const selectedService = ref(null)
-const couponAmount = ref(10)
-const discountRate = computed(() => {
-  const activeActivity = discountActivities[0]
-  if (activeActivity && activeActivity.discount != null) {
-    return Number(activeActivity.discount)
-  }
-  return member.level === '黄金会员' ? 0.85 : 1.0
-})
+const couponAmount = ref(0)
 
 const selectService = (service) => {
   selectedService.value = service
 }
 
 const originalPrice = computed(() => selectedService.value ? selectedService.value.price : 0)
-const discountAmount = computed(() => selectedService.value ? originalPrice.value * (1 - discountRate.value) : 0)
-const payableAmount = computed(() => {
-  if (!selectedService.value) return 0
-  const amount = originalPrice.value * discountRate.value - couponAmount.value
-  return amount > 0 ? amount : 0
-})
+const consumptionCalculation = computed(() => selectedService.value
+  ? calculateConsume({
+      price: originalPrice.value,
+      currentActivities,
+      memberInfo: member
+    })
+  : { activity: null, originalPrice: 0, discountRate: 1, discountAmount: 0, paidAmount: 0 })
+const bestActivity = computed(() => currentActivities[0] || null)
+const otherActivities = computed(() => currentActivities.slice(1))
+const discountAmount = computed(() => consumptionCalculation.value.discountAmount)
+const payableAmount = computed(() => consumptionCalculation.value.paidAmount)
 const balancePay = computed(() => payableAmount.value)
 
 const confirmConsume = () => {
+  const calculation = consumptionCalculation.value
   uni.showModal({
     title: '确认消费',
-    content: `本次消费金额 ¥${payableAmount.value.toFixed(2)}，是否确认支付？`,
+    content: `本次消费金额 ¥${calculation.paidAmount.toFixed(2)}，是否确认支付？`,
     success: (res) => {
       if (res.confirm) {
-        const currentBalance = Number(member.balance || 0)
-        const newBalance = Number((currentBalance - payableAmount.value).toFixed(2))
-        const existingRecords = uni.getStorageSync('consumeRecords') || []
-        const record = {
-          id: Date.now(),
-          serviceName: selectedService.value.name,
-          originalPrice: originalPrice.value,
-          discountAmount: discountAmount.value,
-          couponAmount: couponAmount.value,
-          paidAmount: payableAmount.value,
-          consumeTime: new Date().toLocaleString(),
-          vehicle: member.plate,
-          balanceAfter: newBalance
+        try {
+          const result = consume({
+            serviceName: selectedService.value.name,
+            calculation,
+            vehicle: member.plate
+          })
+          member.balance = result.member.balance
+          uni.navigateTo({
+            url: `/pages/consume/success?amount=${result.calculation.paidAmount}&balance=${result.member.balance}`
+          })
+        } catch (error) {
+          uni.showToast({ title: error.message || '消费失败', icon: 'none' })
         }
-        const updatedRecords = [record, ...existingRecords]
-        uni.setStorageSync('consumeRecords', updatedRecords)
-        member.balance = newBalance
-        saveStoredMemberInfo({ ...member, balance: newBalance })
-        uni.navigateTo({
-          url: `/pages/consume/success?amount=${payableAmount.value}&balance=${newBalance}`
-        })
       }
     }
   })
@@ -284,6 +264,40 @@ const confirmConsume = () => {
 .service-item-active {
   border-color: #1e8f47;
   background: #e5f6e8;
+}
+.activity-group-title {
+  color: #0f3d1a;
+  font-size: 24rpx;
+  font-weight: bold;
+  margin-top: 8rpx;
+}
+.activity-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx;
+  border-radius: 24rpx;
+  background: #f7fbf7;
+  border: 1rpx solid transparent;
+}
+.activity-item-applied {
+  border-color: #1e8f47;
+  background: #e5f6e8;
+}
+.activity-item-disabled {
+  background: #f4f5f4;
+  border-color: #e4e8e4;
+  opacity: 0.6;
+  pointer-events: none;
+}
+.activity-tip {
+  color: #1e8f47;
+  display: block;
+  font-size: 22rpx;
+  margin-top: 8rpx;
+}
+.activity-tip-muted {
+  color: #8a968b;
 }
 .service-name {
   font-size: 28rpx;
