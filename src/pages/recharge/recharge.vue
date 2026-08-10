@@ -14,29 +14,47 @@
           :key="option.amount"
         >
           <text class="package-title">¥{{ option.amount }} 充值</text>
-          <text class="package-desc">赠送 ¥{{ option.bonus }}</text>
+          <text class="package-desc">赠送 ¥{{ option.bonusAmount }}</text>
           <button class="buy-button" @click="selectOption(option)">选择充值</button>
         </view>
       </view>
-      <view class="section" v-if="rechargeActivities.length > 0">
+      <view class="section" v-if="selectedPackage">
         <text class="section-title">充值活动</text>
-        <view class="package" v-for="activity in rechargeActivities" :key="activity.id">
-          <text class="package-title">{{ activity.name }}</text>
-          <text class="package-desc">{{ activity.rechargeAmount ? `充值满 ¥${activity.rechargeAmount} 赠送 ¥${activity.giftAmount}` : '活动进行中' }}</text>
+        <text class="activity-group-title" v-if="rechargeCalculation.campaign">当前使用活动</text>
+        <view class="activity-package activity-package-applied" v-if="rechargeCalculation.campaign">
+          <text class="package-title">{{ rechargeCalculation.campaign.name }}</text>
+          <text class="package-desc">充值满 ¥{{ rechargeCalculation.campaign.thresholdAmount }} 赠送 ¥{{ rechargeCalculation.campaign.bonusAmount }}</text>
+          <text class="activity-tip">已按金额门槛和优先级自动匹配</text>
+        </view>
+        <view class="activity-package activity-package-disabled" v-if="!rechargeCalculation.campaign">
+          <text class="package-title">当前金额无匹配活动</text>
+          <text class="activity-tip activity-tip-muted">继续使用默认充值套餐</text>
         </view>
       </view>
-      <view class="section" v-if="selectedOption">
+      <view class="section" v-if="selectedPackage">
         <text class="section-title">已选择</text>
-        <text class="desc">充值 ¥{{ selectedOption.amount }}，赠送 ¥{{ selectedOption.bonus }}</text>
+        <view class="row">
+          <text>充值金额</text>
+          <text>¥ {{ rechargeAmount }}</text>
+        </view>
+        <view class="row">
+          <text>赠送金额</text>
+          <text>¥ {{ bonusAmount }}</text>
+        </view>
+        <view class="row">
+          <text>最终到账金额</text>
+          <text>¥ {{ totalAmount }}</text>
+        </view>
       </view>
-      <view class="section" v-if="selectedOption">
+      <view class="section" v-if="selectedPackage">
         <button class="action-button" @click="recharge">确认充值</button>
       </view>
       <view class="section">
         <text class="section-title">充值记录</text>
         <view class="record" v-for="item in records" :key="item.id">
-          <text>{{ item.time }}</text>
-          <text>充值 ¥{{ item.amount }}，赠送 ¥{{ item.bonus }}</text>
+          <text>{{ item.createTime || item.time }}</text>
+          <text>本金 ¥{{ item.amount }}，赠送 ¥{{ item.bonus }}，到账 ¥{{ item.totalAmount }}</text>
+          <text v-if="item.activityName">活动：{{ item.activityName }}</text>
         </view>
         <view v-if="records.length === 0" class="empty">暂无充值记录</view>
       </view>
@@ -45,85 +63,70 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { computed, reactive, ref, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
+import { getMemberInfo } from '../../services/memberService.js'
+import { getRechargeRecords, recharge as rechargeMember } from '../../services/rechargeService.js'
+import { createRechargeQuoteFromBackend, getRechargePlansFromBackend } from '../../services/rechargeApiService.js'
 
 const balance = ref(0)
-const options = [
-  { amount: 50, bonus: 5 },
-  { amount: 100, bonus: 15 },
-  { amount: 200, bonus: 40 }
-]
-const selectedOption = ref(null)
+const options = reactive([])
+const selectedPackage = ref(null)
 const records = reactive([])
-const rechargeActivities = reactive([])
-
-const getStoredMemberInfo = () => {
-  const fromMemberInfo = uni.getStorageSync('memberInfo')
-  if (fromMemberInfo && typeof fromMemberInfo === 'object') {
-    return fromMemberInfo
-  }
-  const fromLegacy = uni.getStorageSync('memberData')
-  if (fromLegacy && typeof fromLegacy === 'object') {
-    return fromLegacy
-  }
-  return { registered: false, phone: '', plate: '', level: '黄金会员', balance: 0, points: 0, coupons: 0, benefits: [] }
-}
-
-const saveStoredMemberInfo = (memberInfo) => {
-  const normalized = {
-    ...getStoredMemberInfo(),
-    ...memberInfo,
-    balance: Number(Number(memberInfo.balance || 0).toFixed(2))
-  }
-  uni.setStorageSync('memberInfo', normalized)
-  uni.setStorageSync('memberData', normalized)
-  uni.setStorageSync('memberBalance', normalized.balance)
-}
+const rechargeCalculation = ref({ activity: null, rechargeAmount: 0, bonusAmount: 0, totalAmount: 0 })
+const rechargeAmount = computed(() => rechargeCalculation.value.rechargeAmount)
+const bonusAmount = computed(() => rechargeCalculation.value.bonusAmount)
+const totalAmount = computed(() => rechargeCalculation.value.totalAmount)
 
 const loadMemberBalance = () => {
-  const memberInfo = getStoredMemberInfo()
+  const memberInfo = getMemberInfo()
   balance.value = Number(Number(memberInfo.balance || 0).toFixed(2))
 }
 
-const loadRechargeActivities = () => {
-  const stored = uni.getStorageSync('activities') || []
-  const list = Array.isArray(stored) ? stored : []
-  rechargeActivities.splice(0, rechargeActivities.length, ...list.filter((activity) => activity.status === 'active' && activity.type === 'recharge'))
+const loadRechargeRecords = () => {
+  records.splice(0, records.length, ...getRechargeRecords())
 }
 
-const loadPageData = () => {
+const loadPageData = async () => {
   loadMemberBalance()
-  loadRechargeActivities()
+  loadRechargeRecords()
+  const plans = await Promise.resolve(getRechargePlansFromBackend())
+  options.splice(0, options.length, ...plans)
 }
 
 onMounted(loadPageData)
 onShow(loadPageData)
 
-const selectOption = (option) => {
-  selectedOption.value = option
+const selectOption = async (option) => {
+  selectedPackage.value = option
+  try {
+    rechargeCalculation.value = await Promise.resolve(createRechargeQuoteFromBackend(option))
+  } catch (error) {
+    selectedPackage.value = null
+    uni.showToast({ title: error.message || '报价失败', icon: 'none' })
+  }
 }
 
-const recharge = () => {
-  if (!selectedOption.value) {
+const completeRecharge = () => {
+  if (!selectedPackage.value) {
     uni.showToast({ title: '请选择充值套餐', icon: 'none' })
     return
   }
-  const { amount, bonus } = selectedOption.value
-  const memberInfo = getStoredMemberInfo()
-  const currentBalance = Number(memberInfo.balance || 0)
-  const newBalance = Number((currentBalance + amount).toFixed(2))
-  saveStoredMemberInfo({ ...memberInfo, balance: newBalance })
-  balance.value = newBalance
-  records.unshift({
-    id: Date.now(),
-    time: new Date().toLocaleString(),
-    amount,
-    bonus
-  })
-  selectedOption.value = null
-  uni.showToast({ title: '充值成功', icon: 'success' })
+  try {
+    const result = rechargeMember({
+      quote: rechargeCalculation.value
+    })
+    balance.value = result.member.balance
+    records.unshift(result.record)
+    selectedPackage.value = null
+    rechargeCalculation.value = { activity: null, rechargeAmount: 0, bonusAmount: 0, totalAmount: 0 }
+    uni.showToast({ title: '充值成功', icon: 'success' })
+  } catch (error) {
+    uni.showToast({ title: error.message || '充值失败', icon: 'none' })
+  }
 }
+
+const recharge = () => completeRecharge()
 </script>
 
 <style>
@@ -162,6 +165,38 @@ const recharge = () => {
   border-radius: 14px;
   padding: 14px;
   margin-bottom: 12px;
+}
+.activity-group-title {
+  display: block;
+  font-size: 14px;
+  font-weight: bold;
+  margin: 10px 0;
+}
+.activity-package {
+  background: #f7f7f7;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.activity-package-applied {
+  background: #eef7ff;
+  border-color: #1a73e8;
+}
+.activity-package-disabled {
+  background: #f4f4f4;
+  border-color: #e5e5e5;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.activity-tip {
+  color: #1a73e8;
+  display: block;
+  font-size: 13px;
+  margin-top: 8px;
+}
+.activity-tip-muted {
+  color: #888;
 }
 .package-title {
   font-size: 16px;

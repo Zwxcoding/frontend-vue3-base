@@ -5,6 +5,24 @@
       "style": {
         "navigationBarTitleText": "首页"
       }
+    },
+    {
+      "path": "pages/admin/admin",
+      "style": {
+        "navigationBarTitleText": "管理后台"
+      }
+    },
+    {
+      "path": "pages/admin/recharge-plan/index",
+      "style": {
+        "navigationBarTitleText": "充值套餐管理"
+      }
+    },
+    {
+      "path": "pages/admin/recharge-campaign/index",
+      "style": {
+        "navigationBarTitleText": "充值营销活动管理"
+      }
     }
   ]
 }

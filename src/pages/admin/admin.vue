@@ -48,6 +48,16 @@
       </view>
 
       <view class="card">
+        <text class="section-title">充值套餐管理</text>
+        <button class="small-button" @click="goRechargePlanList">进入套餐管理</button>
+      </view>
+
+      <view class="card">
+        <text class="section-title">充值营销活动管理</text>
+        <button class="small-button" @click="goRechargeCampaignList">进入营销活动管理</button>
+      </view>
+
+      <view class="card">
         <text class="section-title">活动配置</text>
         <view class="config-item" v-for="activity in activities" :key="activity.id">
           <view class="config-row">
@@ -137,6 +147,18 @@ const logout = () => {
 const goActivityList = () => {
   uni.navigateTo({
     url: '/pages/admin/activity/index'
+  })
+}
+
+const goRechargePlanList = () => {
+  uni.navigateTo({
+    url: '/pages/admin/recharge-plan/index'
+  })
+}
+
+const goRechargeCampaignList = () => {
+  uni.navigateTo({
+    url: '/pages/admin/recharge-campaign/index'
   })
 }
 
