@@ -1,5 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AdminRechargeController } from '../controllers/adminRechargeController.js'
+import type { AccountController } from '../controllers/accountController.js'
+import type { MemberController } from '../controllers/memberController.js'
 
 export type HttpHandler = (request: IncomingMessage, response: ServerResponse) => Promise<void> | void
 
@@ -7,6 +9,9 @@ export interface ApiHandlers {
   createRechargeQuote: HttpHandler
   listRechargePlans: HttpHandler
   admin: AdminRechargeController
+  members: MemberController
+  accounts: AccountController
+  allowInternalMemberApi: boolean
 }
 
 export const createRouter = (handlers: ApiHandlers): HttpHandler =>
@@ -18,6 +23,33 @@ export const createRouter = (handlers: ApiHandlers): HttpHandler =>
     }
     if (request.method === 'GET' && pathname === '/api/v1/recharge/plans') {
       await handlers.listRechargePlans(request, response); return
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/members/me') {
+      await handlers.members.getCurrent(request, response)
+      return
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/accounts/me') {
+      await handlers.accounts.getCurrent(request, response)
+      return
+    }
+    const memberMatch = pathname.match(/^\/api\/v1\/members\/([^/]+)$/)
+    if (memberMatch?.[1]) {
+      if (!handlers.allowInternalMemberApi) return sendNotFound(response)
+      const id = decodeURIComponent(memberMatch[1])
+      if (request.method === 'GET') await handlers.members.get(request, response, id)
+      else return sendNotFound(response)
+      return
+    }
+    const accountMatch = pathname.match(/^\/api\/v1\/accounts\/([^/]+)(?:\/(credit|debit))?$/)
+    if (accountMatch?.[1]) {
+      if (!handlers.allowInternalMemberApi) return sendNotFound(response)
+      const memberId = decodeURIComponent(accountMatch[1])
+      const action = accountMatch[2]
+      if (request.method === 'GET' && !action) await handlers.accounts.get(request, response, memberId)
+      else if (request.method === 'POST' && action === 'credit') await handlers.accounts.credit(request, response, memberId)
+      else if (request.method === 'POST' && action === 'debit') await handlers.accounts.debit(request, response, memberId)
+      else return sendNotFound(response)
+      return
     }
     if (pathname === '/api/admin/recharge/plans') {
       if (request.method === 'GET') await handlers.admin.listPlans(request, response)

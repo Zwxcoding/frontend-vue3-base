@@ -2,6 +2,9 @@ import 'dotenv/config'
 export interface AppConfig {
   databaseUrl: string
   port: number
+  nodeEnv: string
+  devMemberToken: string
+  devMemberId: string
 }
 
 export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
@@ -12,7 +15,10 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
 
   return {
     databaseUrl: env.DATABASE_URL ?? '',
-    port
+    port,
+    nodeEnv: env.NODE_ENV ?? 'development',
+    devMemberToken: env.DEV_MEMBER_TOKEN ?? '',
+    devMemberId: env.DEV_MEMBER_ID ?? ''
   }
 }
 

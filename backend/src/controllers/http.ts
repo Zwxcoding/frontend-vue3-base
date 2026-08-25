@@ -14,8 +14,10 @@ export const sendJson = (response: ServerResponse, status: number, body: unknown
 
 export const sendApplicationError = (response: ServerResponse, error: unknown): void => {
   const message = error instanceof Error ? error.message : 'Unexpected error'
+  const unauthorized = /unauthorized|identity is disabled|identity is not configured/i.test(message)
   const notFound = /not found/i.test(message)
   const invalid = /invalid|required|must|exists/i.test(message)
-  const status = notFound ? 404 : invalid ? 400 : 500
-  sendJson(response, status, { error: { code: notFound ? 'NOT_FOUND' : invalid ? 'INVALID_INPUT' : 'INTERNAL_ERROR', message } })
+  const status = unauthorized ? 401 : notFound ? 404 : invalid ? 400 : 500
+  const code = unauthorized ? 'UNAUTHORIZED' : notFound ? 'NOT_FOUND' : invalid ? 'INVALID_INPUT' : 'INTERNAL_ERROR'
+  sendJson(response, status, { error: { code, message } })
 }
