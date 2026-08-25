@@ -34,12 +34,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getMemberInfo } from '../../services/memberService.js'
+import { getMemberReadSnapshot } from '../../services/memberReadService.js'
 
 const balance = ref(0)
 
-const loadBalance = () => {
-  const memberInfo = getMemberInfo()
+const loadBalance = async () => {
+  const { member: memberInfo } = await getMemberReadSnapshot()
   balance.value = Number(Number(memberInfo.balance || 0).toFixed(2))
 }
 

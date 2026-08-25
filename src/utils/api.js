@@ -2,12 +2,12 @@ const API_BASE_URL = globalThis.__CAR_WASH_API_BASE_URL__ || 'http://localhost:3
 
 export const hasBackendApi = () => typeof uni !== 'undefined' && typeof uni.request === 'function'
 
-export const requestBackend = ({ url, method = 'GET', data }) => new Promise((resolve, reject) => {
+export const requestBackend = ({ url, method = 'GET', data, header = {} }) => new Promise((resolve, reject) => {
   uni.request({
     url: `${API_BASE_URL}${url}`,
     method,
     data,
-    header: { 'content-type': 'application/json' },
+    header: { 'content-type': 'application/json', ...header },
     success: (response) => {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         resolve(response.data?.data)

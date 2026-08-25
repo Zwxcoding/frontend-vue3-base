@@ -41,7 +41,7 @@
 <script setup>
 import { reactive, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getMemberInfo } from '../../services/memberService.js'
+import { getMemberReadSnapshot } from '../../services/memberReadService.js'
 
 const member = reactive({
   registered: false,
@@ -54,8 +54,8 @@ const member = reactive({
   benefits: []
 })
 
-const loadMember = () => {
-  const stored = getMemberInfo()
+const loadMember = async () => {
+  const { member: stored } = await getMemberReadSnapshot()
   Object.assign(member, { registered: false, phone: '', plate: '', level: '黄金会员', balance: 0, points: 0, coupons: 0, benefits: [] }, stored)
   member.balance = Number(Number(member.balance || 0).toFixed(2))
 }
