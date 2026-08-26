@@ -8,13 +8,16 @@ import { GetAccount } from './application/account/GetAccount.js'
 import { ListTransactions } from './application/account/ListTransactions.js'
 import { GetMember } from './application/member/GetMember.js'
 import { UpdateMemberProfile } from './application/member/UpdateMemberProfile.js'
+import { LoginWithWxCode } from './application/auth/LoginWithWxCode.js'
+import { SessionStore } from './application/auth/SessionStore.js'
 import { createRouter } from './api/router.js'
 import { loadConfig } from './config/env.js'
 import { createRechargeQuoteController } from './controllers/rechargeQuoteController.js'
 import { createAdminRechargeController } from './controllers/adminRechargeController.js'
 import { createAccountController } from './controllers/accountController.js'
 import { createMemberController } from './controllers/memberController.js'
-import { createDevelopmentMemberContext } from './controllers/memberContext.js'
+import { createMemberIdentityResolver } from './controllers/memberContext.js'
+import { createWxAuthController } from './controllers/wxAuthController.js'
 import { sendJson } from './controllers/http.js'
 import { getDatabasePool } from './database/pool.js'
 import { PostgresRechargeCampaignRepository } from './repositories/postgres/PostgresRechargeCampaignRepository.js'
@@ -36,7 +39,15 @@ const members = new PostgresMemberRepository(database)
 const accounts = new PostgresMemberAccountRepository(database)
 const transactions = new PostgresAccountTransactionRepository(database)
 const accountDomainService = new AccountService(new PostgresAccountTransactionManager(database))
-const resolveCurrentMemberId = createDevelopmentMemberContext(config)
+const sessionStore = new SessionStore()
+sessionStore.start()
+const resolveCurrentMemberId = createMemberIdentityResolver({
+  nodeEnv: config.nodeEnv,
+  devMemberToken: config.devMemberToken,
+  devMemberId: config.devMemberId,
+  sessionStore
+})
+const loginWithWxCode = new LoginWithWxCode(members, sessionStore, config.wxAppId, config.wxAppSecret)
 
 const createQuote = new CreateRechargeQuote({ plans, campaigns, quotes })
 const adminPlans = new AdminRechargePlanService(plans)
@@ -55,6 +66,7 @@ const router = createRouter({
     new ListTransactions(transactions),
     resolveCurrentMemberId
   ),
+  wxAuth: createWxAuthController(loginWithWxCode, sessionStore),
   allowInternalMemberApi: config.nodeEnv !== 'production'
 })
 const server = createServer(router)

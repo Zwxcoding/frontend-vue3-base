@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AdminRechargeController } from '../controllers/adminRechargeController.js'
 import type { AccountController } from '../controllers/accountController.js'
 import type { MemberController } from '../controllers/memberController.js'
+import type { WxAuthController } from '../controllers/wxAuthController.js'
 
 export type HttpHandler = (request: IncomingMessage, response: ServerResponse) => Promise<void> | void
 
@@ -11,6 +12,7 @@ export interface ApiHandlers {
   admin: AdminRechargeController
   members: MemberController
   accounts: AccountController
+  wxAuth: WxAuthController
   allowInternalMemberApi: boolean
 }
 
@@ -23,6 +25,14 @@ export const createRouter = (handlers: ApiHandlers): HttpHandler =>
     }
     if (request.method === 'GET' && pathname === '/api/v1/recharge/plans') {
       await handlers.listRechargePlans(request, response); return
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/auth/wx-login') {
+      await handlers.wxAuth.login(request, response)
+      return
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/auth/logout') {
+      await handlers.wxAuth.logout(request, response)
+      return
     }
     if (request.method === 'GET' && pathname === '/api/v1/members/me') {
       await handlers.members.getCurrent(request, response)

@@ -5,6 +5,8 @@ export interface AppConfig {
   nodeEnv: string
   devMemberToken: string
   devMemberId: string
+  wxAppId: string
+  wxAppSecret: string
 }
 
 export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
@@ -18,7 +20,9 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
     port,
     nodeEnv: env.NODE_ENV ?? 'development',
     devMemberToken: env.DEV_MEMBER_TOKEN ?? '',
-    devMemberId: env.DEV_MEMBER_ID ?? ''
+    devMemberId: env.DEV_MEMBER_ID ?? '',
+    wxAppId: env.WX_APPID ?? '',
+    wxAppSecret: env.WX_APP_SECRET ?? ''
   }
 }
 
