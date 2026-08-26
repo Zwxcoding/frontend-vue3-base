@@ -1,6 +1,7 @@
 import { createMember } from '../models/member.js'
 import { hasBackendApi, requestBackend } from '../utils/api.js'
 import { getMemberInfo } from './memberService.js'
+import { buildSessionIdentityHeader } from './wxLoginService.js'
 
 export const MEMBER_READ_MODES = Object.freeze({
   SHADOW: 'shadow',
@@ -8,15 +9,19 @@ export const MEMBER_READ_MODES = Object.freeze({
 })
 
 const configuredReadMode = () => globalThis.__CAR_WASH_MEMBER_READ_MODE__ || import.meta.env.VITE_MEMBER_READ_MODE
-const configuredMemberToken = () => globalThis.__CAR_WASH_DEV_MEMBER_TOKEN__ || import.meta.env.VITE_DEV_MEMBER_TOKEN || ''
+const configuredDevMemberToken = () => globalThis.__CAR_WASH_DEV_MEMBER_TOKEN__ || import.meta.env.VITE_DEV_MEMBER_TOKEN || ''
 
 const getReadMode = () => configuredReadMode() === MEMBER_READ_MODES.DATABASE_FIRST
   ? MEMBER_READ_MODES.DATABASE_FIRST
   : MEMBER_READ_MODES.SHADOW
 
-const getIdentityHeader = () => ({
-  'x-dev-member-token': configuredMemberToken()
-})
+const getIdentityHeader = () => {
+  const sessionHeader = buildSessionIdentityHeader()
+  if (sessionHeader['x-session-token']) return sessionHeader
+  const devToken = configuredDevMemberToken()
+  if (devToken) return { 'x-dev-member-token': devToken }
+  return {}
+}
 
 const normalizeDatabaseMember = (member, account) => createMember({
   registered: member?.status === 'active',
